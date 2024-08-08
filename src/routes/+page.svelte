@@ -30,7 +30,7 @@
 
 	onMount(() => {
 		
-		ws = new WebSocket("ws://cricketserver.zapdos.me/");
+		ws = new WebSocket("wss://cricketserver.zapdos.me/");
 		
 		ws.onopen = () => {
 			chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connected to server'}];
