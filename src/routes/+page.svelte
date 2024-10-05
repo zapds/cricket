@@ -37,7 +37,7 @@
 	onMount(() => {
 
 		
-		worker = new Worker("src/lib/worker.js");
+		worker = new Worker("$lib/worker.js");
 		worker.postMessage({cmd: "connect"});
 
 		worker.onmessage = (event) => {
