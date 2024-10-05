@@ -17,6 +17,7 @@ class Player:
         self.ws = ws
         self.nick = nick
         self.game = game
+        self.online = True
 
     def __eq__(self, other):
         return self.id == other.id
@@ -122,7 +123,8 @@ async def handler(request):
 
     
     print("Websocket connection closed")
-    if player:
+    if player and player.online:
+        player.online = False
         try:
             globalLobby.remove(player)
         except ValueError:

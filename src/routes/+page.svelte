@@ -4,7 +4,10 @@
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import { onMount, onDestroy } from "svelte";
 
-	let ws = null;
+	export let data;
+
+
+	let worker = null;
 
 	let gameId = null;
 	
@@ -27,62 +30,77 @@
 		// {author: 'zap', content: 'hello world'},
 		// {author: 'player2', content: 'hello world'},
 	];
-
+	
+	if (data.url.searchParams.has('gameId')) {
+		gameId = data.url.searchParams.get('gameId');
+	}
 	onMount(() => {
-		
-		ws = new WebSocket("wss://cricketserver.zapdos.me/");
-		
-		ws.onopen = () => {
-			chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connected to server'}];
-		};
 
-		ws.onmessage = (event) => {
-			const data = JSON.parse(event.data);
-			console.log('recv ', data);
-			if (data.type == "chatGlobal") {
-				chatMsgs = [...chatMsgs, {author: data.author, content: data.content}];
+		
+		worker = new Worker("src/lib/worker.js");
+		worker.postMessage({cmd: "connect"});
+
+		worker.onmessage = (event) => {
+			const eData = event.data;
+			console.log('recv ', eData);
+
+			if (eData.event == "recv") {
+				const data = JSON.parse(eData.data);
+				if (data.type == "chatGlobal") {
+					chatMsgs = [...chatMsgs, {author: data.author, content: data.content}];
+				}
+
+				if (data.type == "gameStarted") {
+					const opp = data.opp;
+					oppNick = opp.nick;
+					oppId = opp.id;
+					stage = 'inGame';
+					chatMsgs = [...chatMsgs, {author: '[server]', content: `${opp.nick} joined the game`}];
+					
+				}
+
+				if (data.type == "gameEnded") {
+					serverMsg = data.message;
+					stage = "postGame"
+					chatMsgs = [...chatMsgs, {author: '[server]', content: data.message}];
+				}
+			}
+			
+			if (eData.event == "open") {
+				chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connected to server'}];
 			}
 
-			if (data.type == "gameStarted") {
-				const opp = data.opp;
-				oppNick = opp.nick;
-				oppId = opp.id;
-				stage = 'inGame';
-				chatMsgs = [...chatMsgs, {author: '[server]', content: `${opp.nick} joined the game`}];
-				
-			}
-
-			if (data.type == "gameEnded") {
-				serverMsg = data.message;
+			if (eData.event == "close") {
+				chatMsgs = [...chatMsgs, {author: '[server]', content: `Connection closed [${eData.code}]: ${eData.reason}`}];
+				serverMsg = `Connection closed [${eData.code}]: ${eData.reason}`
 				stage = "postGame"
-				chatMsgs = [...chatMsgs, {author: '[server]', content: data.message}];
 			}
+
+			if (eData.event == "error") {
+				chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connection error'}];
+				console.log('ws error: ', eData.obj);
+			}
+
 		
 		}
-
-		ws.onclose(() => {
-			chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connection closed'}];
-		});
-
-		ws.onerror(() => {
-			chatMsgs = [...chatMsgs, {author: '[server]', content: 'Connection error'}];
-		});
-
+ 
 	})
 
 	function waitForData() {
 		return new Promise((resolve) => {
 			const listener = (event) => {
-				const data = JSON.parse(event.data);
-				ws.removeEventListener("message", listener);
-				resolve(data);
+				if (event.data.event == "recv") {
+					const data = JSON.parse(event.data.data);
+					worker.removeEventListener("message", listener);
+					resolve(data);
+				}
 			}
-			ws.addEventListener("message", listener);
+			worker.addEventListener("message", listener);
 		});
 	}
 
 	function send(data) {
-		ws.send(JSON.stringify(data));
+		worker.postMessage({'cmd': 'send', 'msg': JSON.stringify(data)});
 	}
 
 	function sendChatMsg(event) {
@@ -171,6 +189,7 @@
 
 		<h2 class="text-4xl font-semibold">Waiting for opponent.</h2>
 		<h3 class="text-4xl">Game ID: {gameId}</h3>
+		<img alt="game join QR" src="http://api.qrserver.com/v1/create-qr-code/?data={data.url.href}?gameId={gameId}&size=100x100">
 
 	</div>
 {:else if (stage == "inGame")}
