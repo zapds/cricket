@@ -50,7 +50,7 @@ let ws = null;
 
 onmessage = (event) => {
     console.log('worker recv')
-    cmd = event.data.cmd;
+    let cmd = event.data.cmd;
 
     if (cmd == "connect") {
         ws = new WebSocket("wss://cricketserver.zapdos.me/");
